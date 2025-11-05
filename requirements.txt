@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+pgvector>=0.2.5
+pydantic
+python-dotenv
+orjson
+numpy
+pandas
+# Embeddings + reranker
+openai>=1.45.0
+sentence-transformers>=2.7.0
+torch
+scikit-learn
+pytest
+httpx
