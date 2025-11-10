@@ -39,18 +39,15 @@ class AnswerRequest(BaseModel):
 async def api_answer(req: AnswerRequest):
     cands = hybrid_search(req.query, req.filters, pre_k=200, mmr_k=40)
     ranked = rerank(req.query, cands, top_n=req.top_n)
+    
     # Build context with minimal leakage, include citations
     ctx_lines = []
     for i, r in enumerate(ranked, start=1):
         cite = r.get('title') or 'Source'
         sec = r.get('heading') or ''
         ctx_lines.append(f"[{i}] ({cite}) {sec}\n{r['text'][:1200]}")
-    prompt = PROMPT.format(q=req.query, ctx='\n\n'.join(ctx_lines))
 
-    if TEST_MODE:
-        # Offline answer: concatenate top passages
-        answer = "\n\n".join([f"[{i+1}] {r['text'][:400]}" for i, r in enumerate(ranked)])
-        return {'answer': answer, 'citations': ranked, 'test_mode': True}
+    prompt = PROMPT.format(q=req.query, ctx='\n\n'.join(ctx_lines))
 
     from openai import OpenAI
     client = OpenAI()
