@@ -99,7 +99,5 @@ logs/
 .coverage
 
 # Project-specific
-schema.sql
-config.env
 # Keep example env for reference, ignore only filled ones
 !config.example.env
