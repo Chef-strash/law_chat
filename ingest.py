@@ -26,13 +26,10 @@ register_vector(engine)
 Base.metadata.create_all(engine)
 
 # --- chunker ---
-def simple_chunk(text: str, max_tokens: int = 600) -> List[str]:
-    splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-        model_name=st_model,
-        chunk_size=max_tokens,
-        chunk_overlap=50
-    )
+def simple_chunk(text):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=100)
     chunks = splitter.split_text(text)
+    print(f"Number of chunks: {len(chunks)}")
     return chunks
 
 def _local_embed(s: str, dim: int = EMB_DIM) -> List[float]:
@@ -76,7 +73,7 @@ def ingest_jsonl(path: str, title_key='title', year_key='year', category_key='ca
                 ses.flush()  # get doc.id
 
                 units = []
-                chunks = simple_chunk(full_text, max_tokens=600)
+                chunks = simple_chunk(full_text)
                 for ch in chunks:
                     heading = None
                     inp = f"{title or ''}\n{heading or ''}\n{ch}".strip()
