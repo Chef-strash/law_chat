@@ -10,6 +10,7 @@ numpy
 scipy
 pandas
 langchain
+langchain-text-splitters
 tiktoken
 # Embeddings + reranker
 sentence-transformers>=2.7.0
