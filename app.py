@@ -23,12 +23,44 @@ async def api_search(req: SearchRequest):
     ranked = rerank(req.query, cands, top_n=req.top_n, threshold=req.threshold)
     return {'results': ranked}
 
-# Simple grounded answer using top passages
-PROMPT = (
-    "You are a factual assistant. Answer the user query ONLY using the provided passages.\n"
-    "Cite sources inline as [title §section_no] or [title]. If unsure, say you cannot find it.\n\n"
-    "Question: {q}\n\nPassages:\n{ctx}\n"
-)
+_llm = None
+
+def get_llm():
+
+    global _llm
+    if _llm is None:
+        from langchain.chat_models import init_chat_model
+        
+        # Check if API key is set
+        if not os.environ.get("GOOGLE_API_KEY"):
+            raise ValueError(
+                "GOOGLE_API_KEY not found in environment. "
+            )
+                
+        _llm = init_chat_model(
+            model_name="gemini-2.5-flash",
+            model_provider="google_genai",
+            temperature=0.2
+        )
+        print(f"✓ Gemini LLM initialized")
+    
+    return _llm
+
+# RAG prompt template
+PROMPT_TEMPLATE = """You are a helpful assistant that answers questions based on provided context.
+
+Instructions:
+- Answer the question using ONLY the information from the passages below
+- Cite sources using [Source N] format where N is the source number
+- If the passages don't contain the answer, say "I cannot find this information in the provided context"
+- Be concise and factual
+
+Question: {question}
+
+Context:
+{context}
+
+Answer:"""
 
 class AnswerRequest(BaseModel):
     query: str
@@ -37,24 +69,60 @@ class AnswerRequest(BaseModel):
 
 @app.post('/answer')
 async def api_answer(req: AnswerRequest):
+    """Generate answer using free Google Gemini LLM."""
+    
+    # Get relevant passages
     cands = hybrid_search(req.query, req.filters, pre_k=200, mmr_k=40)
     ranked = rerank(req.query, cands, top_n=req.top_n)
     
-    # Build context with minimal leakage, include citations
+    if not ranked:
+        return {
+            'answer': 'No relevant information found.',
+            'citations': []
+        }
+    
+    # Build context from top passages
     ctx_lines = []
     for i, r in enumerate(ranked, start=1):
-        cite = r.get('title') or 'Source'
-        sec = r.get('heading') or ''
-        ctx_lines.append(f"[{i}] ({cite}) {sec}\n{r['text'][:1200]}")
-
-    prompt = PROMPT.format(q=req.query, ctx='\n\n'.join(ctx_lines))
-
-    from openai import OpenAI
-    client = OpenAI()
-    comp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.0
+        title = r.get('title') or 'Source'
+        heading = r.get('heading') or ''
+        text = r['text'][:1000]  # Limit per passage
+        
+        if heading:
+            ctx_lines.append(f"[Source {i}] {title} - {heading}\n{text}")
+        else:
+            ctx_lines.append(f"[Source {i}] {title}\n{text}")
+    
+    context = '\n\n'.join(ctx_lines)
+    
+    # Format prompt
+    prompt = PROMPT_TEMPLATE.format(
+        question=req.query,
+        context=context
     )
-    answer = comp.choices[0].message.content
-    return {'answer': answer, 'citations': ranked}
+    
+    # Generate answer with Gemini
+    if TEST_MODE:
+        answer = f"[TEST MODE] Mock answer for: {req.query}"
+    else:
+        try:
+            llm = get_llm()
+            response = llm.invoke(prompt)
+            
+            # Extract text from response
+            if hasattr(response, 'content'):
+                answer = response.content
+            else:
+                answer = str(response)
+            
+        except Exception as e:
+            return {
+                'error': f"LLM generation failed: {str(e)}",
+                'citations': ranked
+            }
+    
+    return {
+        'answer': answer,
+        'citations': ranked,
+        'model': os.getenv('LLM_MODEL', 'gemini-2.0-flash-exp')
+    }
