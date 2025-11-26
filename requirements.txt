@@ -1,21 +1,21 @@
-fastapi
-uvicorn[standard]
-sqlalchemy>=2.0
-psycopg[binary]>=3.2
-pgvector>=0.2.5
-pydantic
-python-dotenv
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
 orjson
-numpy
-scipy
-pandas
-langchain
-langchain-text-splitters
-tiktoken
-# Embeddings + reranker
+httpx
+sqlalchemy>=2.0.0
+pgvector>=0.2.5
+psycopg2-binary>=2.9.0
+torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
 sentence-transformers>=2.7.0
 transformers
-torch
 scikit-learn
+numpy>=1.24.0
+scipy
+pandas
+langchain-text-splitters>=0.0.1
+tiktoken
+google-generativeai>=0.3.0
+tavily-python>=0.3.0
 pytest
-httpx

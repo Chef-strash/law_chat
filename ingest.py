@@ -13,21 +13,36 @@ load_dotenv()
 
 TEST_MODE = os.getenv('TEST_MODE', '0') == '1'
 DB_URL = os.getenv('DATABASE_URL')
-MODEL_NAME = os.getenv("EMBED_MODEL", "BAAI/bge-base-en-v1.5")
-EMB_DIM = 768
+
+# --- CONFIGURATION UPDATE ---
+# Updated to BGE-M3 (State-of-the-Art for Multilingual/Legal)
+MODEL_NAME = os.getenv("EMBED_MODEL", "BAAI/bge-m3") 
+# Updated dimensions to match BGE-M3 and new Schema
+EMB_DIM = 1024
 
 # Create model only if not TEST_MODE
 st_model = None
 if not TEST_MODE:
+    print(f"📥 Loading Model: {MODEL_NAME}...")
     st_model = SentenceTransformer(MODEL_NAME)
 
 engine = create_engine(DB_URL)
 register_vector(engine)
 Base.metadata.create_all(engine)
 
-# --- chunker ---
-def simple_chunk(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=100)
+# --- CHUNKER (Updated for Parent-Child Strategy) ---
+def get_child_chunks(text):
+    """
+    Splits the 'Parent' text into smaller 'Child' chunks for vector search.
+    Legal documents need granularity.
+    Chunk Size: ~256 tokens (1024 chars) -> Good for specific clauses.
+    Overlap: 200 chars -> Prevents cutting off sentences/definitions.
+    """
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1024, 
+        chunk_overlap=200,
+        separators=["\n\n", "\n", ". ", " ", ""]
+    )
     chunks = splitter.split_text(text)
     return chunks
 
@@ -45,61 +60,114 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
         return [_local_embed(t) for t in texts]
 
     # self-hosted encoder
-    embs = st_model.encode(texts, normalize_embeddings=True, batch_size=64, show_progress_bar=False)
+    # BGE-M3 handles larger batches well, but keeping 32 for safety on standard GPUs
+    embs = st_model.encode(texts, normalize_embeddings=True, batch_size=32, show_progress_bar=True)
     return embs.tolist()
 
 
-# --- helpers ---
+# --- HELPERS ---
 def make_checksum(s: str) -> str:
     return hashlib.sha1(s.encode('utf-8')).hexdigest()
 
-# --- main ingest ---
+# --- MAIN INGEST ---
 def ingest_jsonl(path: str, title_key='title', year_key='year', category_key='category', text_key='text'):
+    print(f"🚀 Starting ingestion from {path}")
+    
+    # Ensure tables exist
     with engine.begin() as conn:
         Base.metadata.create_all(conn)
+        
     with Session(engine) as ses:
         with open(path, 'r', encoding='utf-8') as f:
             batch_passages: List[Tuple[DocRaw, List[Dict]]] = []
+            count = 0
+            
             for line in f:
-                rec = json.loads(line)
+                if not line.strip(): continue
+                
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    print(f"Skipping invalid JSON line: {line[:50]}...")
+                    continue
+
                 title = rec.get(title_key)
                 year = rec.get(year_key)
                 category = rec.get(category_key)
-                full_text = rec.get(text_key) or ''
+                
+                # The Full Text from JSON is our "Parent Context"
+                parent_text = rec.get(text_key) or ''
+                
+                if not parent_text:
+                    continue
 
+                # 1. Store Raw Document
                 doc = DocRaw(filename=os.path.basename(path), title=title, year=year, category=category, data=rec)
                 ses.add(doc)
-                ses.flush()  # get doc.id
+                ses.flush()  # Generate doc.id
 
+                # 2. Create Child Chunks
                 units = []
-                chunks = simple_chunk(full_text)
-                for ch in chunks:
-                    heading = None
-                    inp = f"{title or ''}\n{heading or ''}\n{ch}".strip()
+                child_chunks = get_child_chunks(parent_text)
+                
+                for ch in child_chunks:
+                    heading = rec.get('heading') # If your JSON has specific headings, use them
+                    
+                    # Contextual text for Embedding (Title + Heading + Chunk)
+                    # This helps the vector model understand "Section 302" vs just "Punishment"
+                    embed_input = f"{title or ''}\n{heading or ''}\n{ch}".strip()
+                    
                     units.append({
                         'doc_id': doc.id,
-                        'section_no': None,
+                        'section_no': rec.get('section_no'), # Map if available
                         'heading': heading,
-                        'text': ch,
+                        'text': ch,              # CHILD: The small search unit
+                        'parent_text': parent_text, # PARENT: The full context for LLM
                         'year': year,
                         'category': category,
                         'token_count': len(ch.split()),
-                        'checksum': make_checksum(inp)
+                        'checksum': make_checksum(embed_input),
+                        '_embed_input': embed_input # Temporary field for embedding generation
                     })
+                
                 batch_passages.append((doc, units))
+                count += 1
+                
+                if count % 100 == 0:
+                    print(f"Processed {count} documents...")
 
-            # Flatten for embeddings
-            flat_texts = [f"{doc.title or ''}\n{u['heading'] or ''}\n{u['text']}".strip()
-                           for _, units in batch_passages for u in units]
+            # 3. Generate Embeddings in Bulk
+            if not batch_passages:
+                print("No valid documents found.")
+                return
+
+            print("🧠 Generating embeddings...")
+            
+            # Flatten inputs for the embedding model
+            flat_texts = [u['_embed_input'] for _, units in batch_passages for u in units]
             embs = embed_texts(flat_texts)
-            i = 0
+            
+            # 4. Assign Embeddings and Commit
+            print("💾 Saving to database...")
+            emb_idx = 0
             for _, units in batch_passages:
                 for u in units:
-                    u['embedding'] = np.array(embs[i]).tolist(); i += 1
+                    # Clean up temp field
+                    del u['_embed_input']
+                    # Assign vector
+                    u['embedding'] = np.array(embs[emb_idx]).tolist()
+                    emb_idx += 1
+                    
+                    # Add to session
                     ses.add(Passage(**u))
+            
             ses.commit()
+            print(f"✅ Ingestion complete. Processed {count} docs and {emb_idx} passages.")
 
 if __name__ == '__main__':
-    # Example: python ingest.py /path/to/file.jsonl
+    # Example: python ingest.py data/documents.jsonl
     import sys
-    ingest_jsonl(sys.argv[1])
+    if len(sys.argv) < 2:
+        print("Usage: python ingest.py <path_to_jsonl>")
+    else:
+        ingest_jsonl(sys.argv[1])
