@@ -66,19 +66,20 @@ class ManagerAgent(BaseAgent):
             context_str += f"[{i}] {title} ({doc.get('url')}) [{source_type}]:\n{snippet}\n\n"
             
         prompt = ChatPromptTemplate.from_template("""
-        You are an advanced Indian Legal Assistant. 
-        Answer the user's query based on the provided context.
+        You are an Assistant of a Legal Advocate, you expertizes in Indian Laws and Case related to it. 
+        The user wants to conduct a legal research this is his query {query}. 
+        You have to help the user in his research, so answer the user's query based on the provided context.
         
-        Context:
-        {context}
+        Context: {context}
         
         Query: {query}
         
-        Instructions:
+        Instructions for answering the query:
+        - To answer, breakdown the query into different aspects and derive the answer for each aspect from the give context.
         - Cite your sources using the [Number] format.
         - Differentiate between Statutes (Law) and Precedents (Cases).
         - If the context doesn't contain the answer, say so, but attempt to infer from general legal knowledge if safe.
-        - Be professional, precise, and structured.
+        - Be professional, precise, and legally sound.
         """)
         
         chain = prompt | self.llm | StrOutputParser()

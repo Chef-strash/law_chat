@@ -16,11 +16,11 @@ def test_health():
 def test_chat():
     print("Testing Chat Endpoint...")
     try:
-        response = client.post("/chat", json={"query": "What is Article 21?"})
+        response = client.post("/chat", json={"query": "What is Article 21? answer in points"})
         if response.status_code == 200:
             print("✅ Chat Success")
             data = response.json()
-            print(f"Answer Preview: {data['answer'][:50]}...")
+            print(f"Answer Preview: {data['answer']}...")
         else:
             print(f"❌ Chat Failed: {response.status_code} - {response.text}")
     except Exception as e:

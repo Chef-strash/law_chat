@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple, Optional
 import trafilatura
 from tavily import TavilyClient
 from ddgs import DDGS
-from ..config import TAVILY_API_KEY, FIRECRAWLER_API_KEY, WEB_SEARCH_MAX_RESULTS, PREFERRED_DOMAINS
+from lex_bot.config import TAVILY_API_KEY, FIRECRAWLER_API_KEY, WEB_SEARCH_MAX_RESULTS, PREFERRED_DOMAINS
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -49,7 +49,10 @@ class WebSearchTool:
             # Tavily 'include_domains' logic
             # Tavily has a generic limit around 400 chars for the 'query' param in some tiers
             # Truncating to be safe
-            safe_query = query[:390]
+            if len(query) > 400:
+                safe_query = query[:390]
+            else:
+                safe_query = query
             response = self.tavily_client.search(
                 query=safe_query,
                 search_depth="advanced",
@@ -75,8 +78,9 @@ class WebSearchTool:
             if downloaded:
                 text = trafilatura.extract(downloaded, favor_precision=True)
                 if text:
-                    return f"Source: {url}\n\n{text}\n\n"
+                    return f"\n\n{text}\n\n"
         except:
+            logger.error(f"Trafilatura failed for {url}: {e}")
             pass
         
         # 2. Firecrawl Fallback
@@ -87,7 +91,7 @@ class WebSearchTool:
                 if hasattr(self.firecrawl, 'scrape_url'):
                     data = self.firecrawl.scrape_url(url, params={"formats": ["markdown"]})
                     if 'markdown' in data:
-                        return f"Source: {url}\n\n{data['markdown']}\n\n"
+                        return f"\n\n{data['markdown']}\n\n"
             except Exception as e:
                 logger.error(f"Firecrawl failed for {url}: {e}")
         
@@ -126,3 +130,7 @@ class WebSearchTool:
 
 # Singleton initialization
 web_search_tool = WebSearchTool()
+if __name__ =="__main__":
+    a, b= web_search_tool.run("Andra Pradesh fundamental rights")
+    print(a, b, sep="\n\n")
+    print(len(a))
