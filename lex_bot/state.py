@@ -20,6 +20,9 @@ class AgentState(TypedDict):
     law_context: Annotated[List[Dict], operator.add]
     case_context: Annotated[List[Dict], operator.add]
     
+    # Outline
+    #outline: Optional[str]
+
     # Final answer
     final_answer: Optional[str]
     

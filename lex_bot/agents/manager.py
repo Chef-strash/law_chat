@@ -42,6 +42,65 @@ class ManagerAgent(BaseAgent):
             # Fallback: Send to both
             return {"law_query": original_query, "case_query": original_query}
 
+    # def generate_outline(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    #     """
+    #     Aggregates context and generates outline.
+    #     """
+    #     print("📝 Generating Outline...")
+    #     law_ctx = state.get("law_context", [])
+    #     case_ctx = state.get("case_context", [])
+        
+    #     # Combine all candidates
+    #     all_docs = law_ctx + case_ctx
+        
+    #     # Context Management: Rerank everything against original query to find the absolute best chunks
+    #     # Limit to fit context window (e.g. Top 15)
+    #     top_docs = rerank_documents(state["original_query"], all_docs, top_n=15)
+        
+    #     # Format context
+    #     context_str = ""
+    #     for i, doc in enumerate(top_docs, 1):
+    #         source_type = doc.get('source', 'Web')
+    #         title = doc.get('title', 'Untitled')
+    #         snippet = doc.get('search_hit') or doc.get('snippet') or doc.get('text', '')
+    #         context_str += f"[{i}] {title} ({doc.get('url')}) [{source_type}]:\n{snippet}\n\n"
+            
+    #     prompt = ChatPromptTemplate.from_template("""
+        # You are an Assistant to a Legal Advocate specializing in Indian Law.
+
+        # Your task is to produce a structured OUTLINE of how you will research and answer the user's legal query.
+
+        # DO NOT provide the final answer yet.
+
+        # Using ONLY the provided context, create an outline that includes:
+
+        # 1. Key legal issues raised by the query.
+        # 2. Relevant statutes (sections of acts) found in context.
+        # 3. Relevant case law (precedents) found in context.
+        # 4. Sub-questions that must be answered.
+        # 5. Which parts of the context apply to each sub-question.
+        # 6. What additional general legal principles (Indian law only) may assist, if safe.
+
+        # Rules:
+        # - Do NOT generate any legal conclusions or final answers here.
+        # - Do NOT hallucinate cases or statutes not present in the context (general principles allowed, but flagged as such).
+        # - Focus only on structuring the reasoning.
+
+        # Context:
+        # {context}
+
+        # Query:
+        # {query}
+
+        # Now produce ONLY the outline.
+
+    #     """)
+        
+    #     chain = prompt | self.llm | StrOutputParser()
+    #     answer = chain.invoke({"context": context_str, "query": state["original_query"]})
+        
+    #     return {"outline": answer}
+
     def generate_response(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Aggregates context and generates final answer.
