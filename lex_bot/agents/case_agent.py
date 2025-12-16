@@ -1,8 +1,8 @@
 from typing import Dict, Any
-from .base_agent import BaseAgent
-from ..tools.web_search import web_search_tool
-from ..tools.reranker import rerank_documents
-from ..config import TARGET_CASE_SITE#, PREFERRED_DOMAINS
+from lex_bot.agents.base_agent import BaseAgent
+from lex_bot.tools.web_search import web_search_tool
+from lex_bot.tools.reranker import rerank_documents
+from lex_bot.config import TARGET_CASE_SITE#, PREFERRED_DOMAINS
 
 class CaseAgent(BaseAgent):
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -16,7 +16,7 @@ class CaseAgent(BaseAgent):
         print(f"🏛️ Case Agent Processing: {query}")
         
         # 1. Enhance Query
-        enhanced_query = self.enhance_query(query, "case")
+        enhanced_query = query #self.enhance_query(query, "case")
         print(f"   Enhanced: {enhanced_query}")
         
         # 2. Define Domains
@@ -33,3 +33,8 @@ class CaseAgent(BaseAgent):
         return {"case_context": reranked}
 
 case_agent = CaseAgent()
+
+if __name__=="__main__":
+    d=case_agent.run({"case_query": "What is the law of defamation?"})
+    print(type(d))
+    print(d)

@@ -75,7 +75,7 @@ def rerank_documents(query: str, candidates: List[Dict], top_n: int = 10, thresh
 
         # Sort
         candidates.sort(key=lambda x: x['rerank_score'], reverse=True)
-        
+        print(len(candidates))
         # Filter
         if threshold is not None:
             candidates = [c for c in candidates if c['rerank_score'] >= threshold]

@@ -28,6 +28,8 @@ class BaseAgent:
             system_prompt = """You are a legal search optimizer.
             Input: A user query about Indian Law.
             Output: A single line of 5-8 relevant search keywords.
+            - The query shouldn't be a sentence it should just be keywords separated by spaces.
+            - The query shouldn't be long.
             - Include the specific act or section if relevant (e.g. "Article 21").
             - NO explanations, NO lists, NO markdown. Just keywords separated by spaces."""
         elif agent_type == "case":
@@ -35,8 +37,10 @@ class BaseAgent:
             You want to research about specific case(s) and find out the relevant information about it
             so you have to search on the internet about it, so you want to structure your queries in way so that you get most .
             Input: An unstructured user query about Indian legal Case.
-            Output: A single line of 5-8 relevant search keywords.
+            Output: A single line with relevant keywords, do not make a sentence.
             Instructions about the output:
+            - The query shouldn't be a sentence it should just be keywords separated by spaces.
+            - The query shouldn't be long.
             - The query should roughly be structured this way: "Case Name + Court Name + Date of Judgment"
             - Case Name, Court Name, Date of judgement should be extracted from the user query only, if it can't be infered from the user query dont add it in the query.
             - Court Name can be among: Supreme Court or High court with state name or District Court

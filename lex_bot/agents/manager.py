@@ -18,9 +18,19 @@ class ManagerAgent(BaseAgent):
         1. Law Agent: Searches for Statutes, Acts, Sections, and general legal principles.
         2. Case Agent: Searches for specific Precedents, Case Laws, and Judgments.
         
-        If the query is purely about one, leave the other empty.
-        If it's mixed, provide efficient queries for both.
+        If the query is purely about one, leave the other empty. If it's mixed, provide short efficient queries for both.
+        law_query: Include only statutes, acts, sections, and general legal principles that are extracted from the query.
+        case_query: Include only specific precedents, case laws, and judgments that are extracted from the query.
         
+        Instructions:
+        - NO explanations, NO lists, NO markdown. Just keywords separated by spaces.
+        - Do not generate a case_query unless the user asks for it.
+        - If the user asks only about a barticular case then generate query about that case only.
+        - You can generate a law_query if the user asks for it and even when the user asks only for a case_query generate law_query to support the case_query.
+        - The query shouldnt be a sentence it should be juts keywords separated by spaces.
+        - The query shouldnt we long.
+        - Include the specific act or section if relevant (e.g. "Article 21").
+
         Query: {query}
         
         Output JSON format:
@@ -134,6 +144,7 @@ class ManagerAgent(BaseAgent):
         Query: {query}
         
         Instructions for answering the query:
+        - Just give the final answer don't introduce yourself unless asked by the user.
         - To answer, breakdown the query into different aspects and derive the answer for each aspect from the give context.
         - Cite your sources using the [Number] format.
         - Differentiate between Statutes (Law) and Precedents (Cases).

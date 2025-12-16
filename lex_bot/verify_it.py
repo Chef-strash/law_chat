@@ -24,6 +24,7 @@ def run_test():
         print("\n✅ WORKFLOW SUCCESS")
         print("Final Answer Length:", len(result.get("final_answer", "")))
         print("Initial sub-queries:", result.get("law_query"), "|", result.get("case_query"))
+        print("Final state:", result.get("final_answer"))
     except Exception as e:
         print(f"\n❌ WORKFLOW FAILED: {e}")
         import traceback
